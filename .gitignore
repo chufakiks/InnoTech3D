@@ -124,6 +124,6 @@ dmypy.json
 *.iws
 *.ipr
 
-./TrainSet/*
-./data/Pre_processed/*
-./data/Augmented/*
+data/TrainSet/*
+data/Pre_processed/*
+data/Augmented/*
