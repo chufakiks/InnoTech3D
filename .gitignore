@@ -123,3 +123,7 @@ dmypy.json
 *.iml
 *.iws
 *.ipr
+
+./TrainSet/*
+./data/Pre_processed/*
+./data/Augmented/*
