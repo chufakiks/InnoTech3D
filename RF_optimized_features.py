@@ -4,6 +4,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 import open3d as o3d
+from tqdm import tqdm
 import json
 import os
 
@@ -44,35 +45,68 @@ def extract_point_features(points, n_bins = 256):
     # print("features shape after:", features_df.shape)
     return features_df
 
+extracted_dir = './data/Extracted_features'
+os.makedirs(extracted_dir, exist_ok=True)
+
 projects = ['Project1', 'Project2', 'Project3', 'Project4']
 
 all_features = pd.DataFrame()
 all_labels = []
 
-for project in projects:
+# Feature extraction for original data
+for project in tqdm(projects, desc="Processing projects"):
     json_file = f'./data/Pre_processed/{project}_metadata.json'
-
+    
     with open(json_file, "r") as jsonfile:
-            metadata_list = json.load(jsonfile)
-
-    for bb in metadata_list:
+        metadata_list = json.load(jsonfile)
+    
+    for bb in tqdm(metadata_list, desc=f"Extracting features from {project}", leave=False):
         points = pd.read_csv(os.path.join('./data/Pre_processed/', bb["pc_filename"]),
-                    header=None, names=['x', 'y', 'z', 'i', 'r', 'g', 'b'],
-                    sep=" ", usecols=range(0, 7))
-
-        features = extract_point_features(points, n_bins = 512)
+                             header=None, names=['x', 'y', 'z', 'i', 'r', 'g', 'b'],
+                             sep=" ", usecols=range(0, 7))
+        
+        features = extract_point_features(points, n_bins=512)
         all_features = pd.concat([all_features, features], ignore_index=True)
         all_labels.append(bb["label"])
 
-    print("all_features shape:", all_features.shape)
-    # print("Feature vector [0]:", all_features.iloc[0, :])
+print('Original feature extraction finished.')
 
+# TODO: Integrate augmented data
+json_file_path = f'./data/Augmented/augmented.json'
+
+with open(json_file_path, "r") as jsonfile:
+    aug_metadata_list = json.load(jsonfile)
+
+for bb in tqdm(aug_metadata_list, desc="Extracting augmented features"):
+    points = pd.read_csv(os.path.join('./data/Augmented/', bb["pc_filename"]),
+                         header=None, names=['x', 'y', 'z', 'i', 'r', 'g', 'b'],
+                         sep=" ", usecols=range(0, 7))
+
+    features = extract_point_features(points, n_bins=512)
+    all_features = pd.concat([all_features, features], ignore_index=True)
+    all_labels.append(bb["label"])
+
+print('Augmented feature extraction finished.')
+
+# Save all_features and all_labels locally
+features_path = os.path.join(extracted_dir, 'all_features.csv')
+labels_path = os.path.join(extracted_dir, 'all_labels.csv')
+
+all_features.to_csv(features_path, index=False)
+pd.DataFrame(all_labels, columns=['label']).to_csv(labels_path, index=False)
+
+print(f"Features saved to: {features_path}")
+print(f"Labels saved to: {labels_path}")
 
 X = all_features
 y = all_labels
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Load saved data
+all_features = pd.read_csv(features_path)
+all_labels = pd.read_csv(labels_path)['label']
 
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+print("Training RandomForestClassifier...")
 clf = RandomForestClassifier(n_estimators=100, random_state=42)
 clf.fit(X_train, y_train)
 

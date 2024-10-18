@@ -24,7 +24,7 @@ def main():
             metadata_list = json.load(jsonfile)
         
         metadata_combined.extend(metadata_list)
-        # print(len(metadata_combined)) # =450
+        print(len(metadata_combined)) # =450
 
     calculate_label(metadata_combined, label_counts)
     print(label_counts)
@@ -182,5 +182,5 @@ def aug_and_save_helper(idx, bb, augmented_dir = "./data/Augmented/", dp_rate = 
     with open(augmented_file, "w") as jsonfile:
         json.dump(existing_data, jsonfile, indent=4)
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     main()
