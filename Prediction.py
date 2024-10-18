@@ -46,57 +46,12 @@ def extract_point_features(points, n_bins = 256):
     return features_df
 
 extracted_dir = './data/Extracted_features'
-os.makedirs(extracted_dir, exist_ok=True)
-
-projects = ['Project1', 'Project2', 'Project3', 'Project4']
-
-all_features = pd.DataFrame()
-all_labels = []
-
-# Feature extraction for original data
-for project in tqdm(projects, desc="Processing projects"):
-    json_file = f'./data/Pre_processed/{project}_metadata.json'
-    
-    with open(json_file, "r") as jsonfile:
-        metadata_list = json.load(jsonfile)
-    
-    for bb in tqdm(metadata_list, desc=f"Extracting features from {project}", leave=False):
-        points = pd.read_csv(os.path.join('./data/Pre_processed/', bb["pc_filename"]),
-                             header=None, names=['x', 'y', 'z', 'i', 'r', 'g', 'b'],
-                             sep=" ", usecols=range(0, 7))
-        
-        features = extract_point_features(points, n_bins=512)
-        all_features = pd.concat([all_features, features], ignore_index=True)
-        all_labels.append(bb["label"])
-
-print('Original feature extraction finished.')
-
-# TODO: Integrate augmented data
-json_file_path = f'./data/Augmented/augmented.json'
-
-with open(json_file_path, "r") as jsonfile:
-    aug_metadata_list = json.load(jsonfile)
-
-for bb in tqdm(aug_metadata_list, desc="Extracting augmented features"):
-    points = pd.read_csv(os.path.join('./data/Augmented/', bb["pc_filename"]),
-                         header=None, names=['x', 'y', 'z', 'i', 'r', 'g', 'b'],
-                         sep=" ", usecols=range(0, 7))
-
-    features = extract_point_features(points, n_bins=512)
-    all_features = pd.concat([all_features, features], ignore_index=True)
-    all_labels.append(bb["label"])
-
-print('Augmented feature extraction finished.')
-
-# Save all_features and all_labels locally
 features_path = os.path.join(extracted_dir, 'all_features.csv')
 labels_path = os.path.join(extracted_dir, 'all_labels.csv')
-
-all_features.to_csv(features_path, index=False)
-pd.DataFrame(all_labels, columns=['label']).to_csv(labels_path, index=False)
-
-print(f"Features saved to: {features_path}")
-print(f"Labels saved to: {labels_path}")
+all_features = pd.read_csv(features_path)
+all_labels = pd.read_csv(labels_path)['label']
+print(all_features.shape)
+print(all_labels.shape)
 
 X = all_features
 y = all_labels
@@ -111,12 +66,42 @@ clf = RandomForestClassifier(n_estimators=100, random_state=42)
 clf.fit(X_train, y_train)
 
 y_pred = clf.predict(X_test)
-
-# test_results = pd.DataFrame({
-#     'Actual': y_test,
-#     'Predicted': y_pred
-# })
-
-# print(test_results)
-
 print(classification_report(y_test, y_pred))
+
+# Pred
+H_features = pd.DataFrame()
+projects = ['Project1', 'Project2', 'Project3', 'Project4']
+metadata_list_with_predictions = []
+
+for project in tqdm(projects, desc="Processing projects"):
+    json_file = f'./data/Hidden_Pre_processed/{project}_metadata.json'
+    
+    with open(json_file, "r") as jsonfile:
+        metadata_list = json.load(jsonfile)
+    
+    for bb in tqdm(metadata_list, desc=f"Extracting features from {project}", leave=False):
+        points = pd.read_csv(os.path.join('./data/Hidden_Pre_processed/', bb["pc_filename"]),
+                             header=None, names=['x', 'y', 'z', 'i', 'r', 'g', 'b'],
+                             sep=" ", usecols=range(0, 7))
+        
+        features = extract_point_features(points, n_bins=512)
+        H_features = pd.concat([H_features, features], ignore_index=True)
+        bb['features'] = features
+
+    Pred_Label = clf.predict(H_features)
+
+    for idx, bb in enumerate(metadata_list):
+        bb['Label'] = Pred_Label[idx]
+
+    metadata_list_with_predictions.extend(metadata_list)
+
+pred_labels_df = pd.DataFrame(
+    [(bb['id'], bb['Label']) for bb in metadata_list_with_predictions],
+    columns=['id', 'Label']
+)
+
+Pred_labels_path = os.path.join(extracted_dir, 'Pred_labels.csv')
+pred_labels_df.to_csv(Pred_labels_path, index=False)
+
+print('Hidden set feature extraction finished.')
+
